@@ -307,3 +307,40 @@ Focused tests cover the progress projection, query filtering, and observational 
 
 The task journal records lifecycle events in a separate SQLite table: task creation, claims, completion/failure, and interrupted-process recovery. The read-only `list_task_events(task_id)` API returns events in insertion order for audit and debugging. Event details are bounded for task errors, and history does not contain command output or secret values by design. This is an application-level append-only log, not a tamper-proof security audit log; users with direct database write access can alter it.
 
+
+
+## Local Self-X CLI
+
+The goal/task journal is available through the existing Hermes CLI and uses the
+active Hermes home at `selfx/goals.sqlite3`. These commands do not start an
+agent, invoke an LLM, execute a task payload, or grant permissions. Output is
+JSON for scripting and inspection.
+
+Examples:
+
+```text
+hermes self status
+hermes self goals create "Improve diagnostics" --success-criterion "Regression tests pass"
+hermes self goals list --status active
+hermes self goals show GOAL_ID
+hermes self goals pause GOAL_ID
+hermes self goals resume GOAL_ID
+hermes self goals complete GOAL_ID
+hermes self goals cancel GOAL_ID
+hermes self milestones add GOAL_ID "CLI integration" --criterion "Commands have tests"
+hermes self milestones list GOAL_ID
+hermes self tasks add GOAL_ID "Run regression suite" --max-attempts 2
+hermes self tasks list --goal-id GOAL_ID
+hermes self tasks progress GOAL_ID
+hermes self tasks history TASK_ID
+hermes self recover
+hermes self recover --apply
+```
+
+Recovery is a dry run unless `--apply` is supplied. Applying recovery only
+changes interrupted task journal rows to pending or failed based on their retry
+budget. It does **not** execute requeued tasks; any future executor must submit
+them through the existing scheduler, authorization, tool-policy, and approval
+path. The journal alone cannot establish whether an external side effect already
+occurred, so tasks with side effects must be idempotent or independently checked
+before execution.

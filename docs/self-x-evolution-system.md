@@ -15,6 +15,22 @@ This document defines a safe, testable evolution layer for Hermes Agent. It is a
 - No network access in local-only mode.
 - Do not claim a repair succeeded until verification passes.
 
+
+## Implemented foundation: structured goals and restart recovery
+
+The initial local SQLite implementation lives in `agent/selfx_goals.py`.
+
+- `GoalStore.create_goal/list_goals/get_goal/set_goal_status`: persist goals and explicit success criteria.
+- `GoalStore.add_milestone`: attach acceptance criteria to a goal.
+- `GoalStore.add_task`: create a durable task record with a unique idempotency key and bounded retry budget.
+- `GoalStore.claim_task`: atomically claim a pending task so concurrent workers cannot both claim the same pending record.
+- `GoalStore.finish_task`: record completion or a bounded error only for a running task.
+- `GoalStore.recover_interrupted_tasks`: after a process restart, requeue running tasks only if retry budget remains; otherwise mark them failed.
+
+This is a **task journal, not an autonomous executor**. Requeued work must pass the normal scheduler, approval, authorization, and tool-policy checks before it runs. Exactly-once execution of external side effects cannot be guaranteed by a SQLite status row alone; tasks that perform side effects must use idempotent operations or their own external idempotency keys. The module does not invoke shell commands, models, network services, or automatic repairs.
+
+Targeted tests are in `tests/agent/test_selfx_goals.py`. They have been authored but must be run in a bootstrapped checkout before this feature is considered verified.
+
 ## 1. Self-Identity
 
 **Purpose:** Maintain a read-only, timestamped inventory of capabilities and runtime configuration.

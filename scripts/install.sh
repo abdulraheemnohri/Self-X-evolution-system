@@ -83,7 +83,9 @@ while [ $# -gt 0 ]; do
 done
 
 INSTALL_DIR="${INSTALL_DIR:-$HERMES_HOME/self-x-agent}"
-export HERMES_HOME
+# Keep the public Self-X setting and the legacy runtime setting in sync.
+SELF_X_HOME="$HERMES_HOME"
+export SELF_X_HOME HERMES_HOME
 
 INSTALL_LOG="$HERMES_HOME/logs/install.log"
 

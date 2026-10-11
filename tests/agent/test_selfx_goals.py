@@ -87,3 +87,12 @@ def test_task_and_milestone_queries_validate_filters(tmp_path):
     with pytest.raises(KeyError):
         store.list_milestones(goal_id="missing")
 
+@pytest.mark.parametrize("goal_status", ["paused", "completed", "cancelled"])
+def test_inactive_goal_cannot_claim_pending_task(tmp_path, goal_status):
+    store = GoalStore(tmp_path / "inactive.sqlite3")
+    goal = store.create_goal("Goal")
+    task = store.add_task(goal["id"], "Must not start")
+    store.set_goal_status(goal["id"], goal_status)
+    assert store.claim_task(task["id"]) is None
+    assert store.list_tasks(goal_id=goal["id"])[0]["status"] == "pending"
+

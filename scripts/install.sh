@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Hermes Agent bootstrap: clone, acquire uv/Python, then hand the checkout to
+# Self-X bootstrap: clone, acquire uv/Python, then hand the checkout to
 # the same completion an update runs -- command publication, product builds and
 # post-build maintenance -- so a fresh install and a finished update land in one
 # state. Heavy dependencies (tool binaries, browsers, node) are pm's job:
@@ -20,11 +20,11 @@ set -u
 # hygiene can't break the locked sync the way it used to before pm owned it.
 export UV_NO_CONFIG=1
 
-REPO_URL="${HERMES_REPO_URL:-https://github.com/NousResearch/hermes-agent.git}"
+REPO_URL="${SELF_X_REPO_URL:-${HERMES_REPO_URL:-https://github.com/abdulraheemnohri/Self-X-evolution-system.git}}"
 BRANCH="main"
 INSTALL_COMMIT=""
-INSTALL_DIR="${HERMES_INSTALL_DIR:-}"
-HERMES_HOME="${HERMES_HOME:-$HOME/.hermes}"
+INSTALL_DIR="${SELF_X_INSTALL_DIR:-${HERMES_INSTALL_DIR:-}}"
+HERMES_HOME="${SELF_X_HOME:-${HERMES_HOME:-$HOME/.selfx}}"
 STAGE=""
 WANT_MANIFEST=false
 JSON=false
@@ -82,7 +82,7 @@ while [ $# -gt 0 ]; do
     esac
 done
 
-INSTALL_DIR="${INSTALL_DIR:-$HERMES_HOME/hermes-agent}"
+INSTALL_DIR="${INSTALL_DIR:-$HERMES_HOME/self-x-agent}"
 export HERMES_HOME
 
 INSTALL_LOG="$HERMES_HOME/logs/install.log"
@@ -162,9 +162,9 @@ stage_signal() {
 print_banner() {
     printf '\n%s%s' "$C_MAGENTA" "$C_BOLD"
     printf '%s\n' "┌─────────────────────────────────────────────────────────┐"
-    printf '%s\n' "│             ☤ Hermes Agent Installer                    │"
+    printf '%s\n' "│             * Self-X Agent Installer                    │"
     printf '%s\n' "├─────────────────────────────────────────────────────────┤"
-    printf '%s\n' "│  An open source AI agent by Nous Research.              │"
+    printf '%s\n' "│  Local-first autonomous agent and evolution system.     │"
     printf '%s\n' "└─────────────────────────────────────────────────────────┘"
     printf '%s\n' "$C_NC"
 }

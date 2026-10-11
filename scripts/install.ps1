@@ -20,6 +20,7 @@
 param(
     [string]$Branch = "main",
     [string]$Commit = "",
+    [Alias("SelfXHome")]
     [string]$HermesHome = $(if ($env:SELF_X_HOME) { $env:SELF_X_HOME } elseif ($env:HERMES_HOME) { $env:HERMES_HOME } else { "$env:LOCALAPPDATA\Self-X" }),
     [string]$InstallDir = $(if ($env:SELF_X_INSTALL_DIR) { $env:SELF_X_INSTALL_DIR } elseif ($env:HERMES_INSTALL_DIR) { $env:HERMES_INSTALL_DIR } elseif ($env:SELF_X_HOME) { "$env:SELF_X_HOME\self-x-agent" } elseif ($env:HERMES_HOME) { "$env:HERMES_HOME\self-x-agent" } else { "$env:LOCALAPPDATA\Self-X\self-x-agent" }),
     [switch]$Manifest,

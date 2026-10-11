@@ -105,7 +105,8 @@ def cmd_self(args) -> int:
     """Dispatch Self-X journal commands with machine-readable JSON output."""
     action = getattr(args, "self_action", None) or "status"
     try:
-        store = _store()
+        # Identity and diagnostics must remain read-only and must not initialize the goal DB.
+        store = None if action in {"identity", "diagnose"} else _store()
         if action == "identity":
             from agent.selfx_diagnostics import collect_identity
             _emit(collect_identity())

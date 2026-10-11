@@ -20,7 +20,7 @@ _env_path = get_env_path()
 load_hermes_dotenv(hermes_home=_env_path.parent, project_env=PROJECT_ROOT / ".env")
 
 from hermes_cli.colors import Colors, color
-from hermes_cli.doctor_report import Finding, _section, check_bool, check_info, doctor_check, warn_on_error
+from hermes_cli.doctor_report import Finding, _section, check_bool, check_fail, check_info, check_ok, check_warn, doctor_check, warn_on_error
 from hermes_cli.doctor_connectivity import _has_healthy_oauth_fallback_for_apikey_provider, build_probes, run_probes
 from hermes_cli.doctor_tools import _safe_which
 
@@ -108,6 +108,36 @@ def _check_api_connectivity(should_fix: bool, f: Finding) -> None:
             f.issues.extend(r.issues)
 
 
+
+@doctor_check(on_error="Self-X diagnostics unavailable", detail="({e})")
+def _check_selfx_foundation(should_fix: bool, f: Finding) -> None:
+    """Expose the read-only Self-X identity/diagnostics foundation through hermes doctor."""
+    # Import locally so a broken optional Self-X module never prevents the rest of doctor
+    # from loading. This check deliberately never repairs or mutates anything.
+    from agent.selfx_diagnostics import collect_identity, run_diagnostics
+
+    identity = collect_identity(optional_imports=())
+    runtime = identity.get("runtime", {})
+    check_info(
+        "Self-X identity: "
+        f"Python {runtime.get('python', 'unknown')}; "
+        f"{len(identity.get('capabilities', []))} capability records; "
+        "secret values excluded"
+    )
+    findings = run_diagnostics(paths=[HERMES_HOME], optional_imports=())
+    if not findings:
+        check_ok("Self-X read-only diagnostics", "no filesystem/resource findings")
+        return
+    for finding in findings:
+        detail = f"{finding.severity}: {finding.evidence}"
+        if finding.severity in {"HIGH", "CRITICAL"}:
+            check_fail(f"Self-X: {finding.summary}", detail)
+        else:
+            check_warn(f"Self-X: {finding.summary}", detail)
+        f.manual_issues.append(
+            f"Self-X [{finding.id}] {finding.summary}. Suggested action: {finding.suggested_action}"
+        )
+
 # Ordered (section title, check). None title = check prints its own header (or none); order is user-visible.
 DOCTOR_CHECKS = (
     ('Security Advisories', _check_security_advisories), ('MCP Server Security', _check_mcp_security),
@@ -118,7 +148,8 @@ DOCTOR_CHECKS = (
     ('xAI Model Retirement (May 15, 2026)', _check_xai_retirement),
     ('Session Reset (timers removed Sep 7, 2026)', _check_retired_session_reset),
     ('Auth Providers', _check_auth_providers),
-    ('Directory Structure', _check_directory_structure), (None, _check_state_db), (None, _check_cron_store),
+    ('Directory Structure', _check_directory_structure), ('Self-X Identity & Diagnostics', _check_selfx_foundation),
+    (None, _check_state_db), (None, _check_cron_store),
     (None, _check_checkpoint_store),
     (None, _check_gateway_supervision), (None, _check_command_installation),
     ('External Tools', _check_git_and_rg), (None, _check_terminal_backend), (None, _check_node_and_browser),

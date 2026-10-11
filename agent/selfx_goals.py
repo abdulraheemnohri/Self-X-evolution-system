@@ -173,13 +173,79 @@ class GoalStore:
         result["payload"] = json.loads(result.pop("payload_json"))
         return result
 
+    def list_tasks(self, *, goal_id: str | None = None, status: str | None = None) -> list[dict]:
+        """List task records for progress views; never claims or executes work."""
+        if status is not None and status not in _TASK_STATUSES:
+            raise ValueError(f"Unsupported task status: {status}")
+        clauses, params = [], []
+        if goal_id is not None:
+            clauses.append("goal_id = ?")
+            params.append(goal_id)
+        if status is not None:
+            clauses.append("status = ?")
+            params.append(status)
+        where = (" WHERE " + " AND ".join(clauses)) if clauses else ""
+        with self._connect() as db:
+            rows = db.execute(
+                "SELECT * FROM selfx_tasks" + where + " ORDER BY created_at, id",
+                params,
+            ).fetchall()
+        return [self._task_dict(row) for row in rows]
+
+    def get_progress(self, goal_id: str) -> dict:
+        """Return a stable, read-only progress projection for a single goal."""
+        goal = self.get_goal(goal_id)
+        tasks = self.list_tasks(goal_id=goal_id)
+        milestones = self.list_milestones(goal_id=goal_id)
+        task_counts = {status: 0 for status in sorted(_TASK_STATUSES)}
+        for task in tasks:
+            task_counts[task["status"]] += 1
+        milestone_counts = {status: 0 for status in ("pending", "completed", "cancelled")}
+        for milestone in milestones:
+            milestone_counts[milestone["status"]] += 1
+        total = len(tasks)
+        return {
+            "goal_id": goal_id,
+            "goal_status": goal["status"],
+            "task_total": total,
+            "task_counts": task_counts,
+            "task_completion_ratio": (task_counts["completed"] / total) if total else 0.0,
+            "milestone_total": len(milestones),
+            "milestone_counts": milestone_counts,
+        }
+
+    def list_milestones(self, *, goal_id: str) -> list[dict]:
+        """List milestones for a goal in creation order."""
+        with self._connect() as db:
+            if not db.execute("SELECT 1 FROM selfx_goals WHERE id=?", (goal_id,)).fetchone():
+                raise KeyError(f"Unknown goal: {goal_id}")
+            rows = db.execute(
+                "SELECT * FROM selfx_milestones WHERE goal_id=? ORDER BY created_at, id",
+                (goal_id,),
+            ).fetchall()
+        results = []
+        for row in rows:
+            item = dict(row)
+            item["acceptance_criteria"] = json.loads(item["acceptance_criteria"])
+            results.append(item)
+        return results
+
     def claim_task(self, task_id: str) -> dict | None:
         """Atomically claim a pending task once; repeated claims cannot double-start it."""
         with self._connect() as db:
             db.execute("BEGIN IMMEDIATE")
-            row = db.execute("SELECT * FROM selfx_tasks WHERE id=?", (task_id,)).fetchone()
+            row = db.execute(
+                """SELECT t.*, g.status AS goal_status
+                   FROM selfx_tasks AS t
+                   JOIN selfx_goals AS g ON g.id = t.goal_id
+                   WHERE t.id = ?""",
+                (task_id,),
+            ).fetchone()
             if row is None:
                 raise KeyError(f"Unknown task: {task_id}")
+            # A paused, completed, or cancelled goal must never yield new work.
+            if row["goal_status"] != "active":
+                return None
             if row["status"] != "pending" or row["attempts"] >= row["max_attempts"]:
                 return None
             now = time.time()

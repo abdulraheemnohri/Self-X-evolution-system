@@ -6,6 +6,7 @@ scheduler, tool authorization and approval path.
 """
 from __future__ import annotations
 
+import json
 from typing import Any, Optional
 from pathlib import Path
 
@@ -26,6 +27,17 @@ def _store(profile: Optional[str] = None):
     else:
         home = Path(get_hermes_home())
     return GoalStore(Path(home) / "selfx" / "goals.sqlite3")
+
+
+async def _read_object(request: Request) -> dict[str, Any]:
+    """Parse a JSON object and return a client error for malformed/non-object bodies."""
+    try:
+        body = await request.json()
+    except (ValueError, UnicodeDecodeError) as exc:
+        raise HTTPException(status_code=400, detail="Malformed JSON body") from exc
+    if not isinstance(body, dict):
+        raise HTTPException(status_code=422, detail="JSON object required")
+    return body
 
 
 def _body_text(body: dict[str, Any], key: str, *, required: bool = False, limit: int = 500) -> str:
@@ -111,9 +123,7 @@ async def selfx_list_goals(status: Optional[str] = Query(default=None), profile:
 
 @router.post("/api/selfx/goals")
 async def selfx_create_goal(request: Request, profile: Optional[str] = Query(default=None)):
-    body = await request.json()
-    if not isinstance(body, dict):
-        raise HTTPException(status_code=422, detail="JSON object required")
+    body = await _read_object(request)
     try:
         return _store(profile).create_goal(
             _body_text(body, "title", required=True),
@@ -180,6 +190,8 @@ async def selfx_add_task(goal_id: str, request: Request, profile: Optional[str] 
     payload = body.get("payload", {})
     if not isinstance(payload, dict):
         raise HTTPException(status_code=422, detail="payload must be a JSON object")
+    if len(json.dumps(payload, ensure_ascii=False)) > 16_384:
+        raise HTTPException(status_code=422, detail="payload must not exceed 16 KiB")
     try:
         return _store(profile).add_task(
             goal_id, _body_text(body, "title", required=True),

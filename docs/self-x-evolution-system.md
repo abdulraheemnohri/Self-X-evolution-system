@@ -1,6 +1,6 @@
 # Self-X Evolution System
 
-This document defines a safe, testable evolution layer for Hermes Agent. It is a design and implementation contract, not a claim that every module described here is already implemented.
+This document defines the safe evolution layer for the standalone Self-X product. The runtime still contains Hermes-compatible internal modules while the migration proceeds; the public CLI and installer now target Self-X. This is a design and implementation contract, not a claim that every module described here is already implemented.
 
 ## Goals and invariants
 

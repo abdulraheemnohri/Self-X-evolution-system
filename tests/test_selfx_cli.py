@@ -116,3 +116,25 @@ def test_diagnose_is_read_only_and_does_not_create_goal_database(monkeypatch, tm
     assert seen["paths"] == [tmp_path]
     assert seen["database_paths"] == []
     assert not (tmp_path / "selfx" / "goals.sqlite3").exists()
+
+
+def test_selfx_entrypoint_uses_its_own_default_home(monkeypatch, tmp_path):
+    from hermes_cli import selfx_entry
+
+    monkeypatch.setenv("HOME", str(tmp_path))
+    monkeypatch.delenv("SELF_X_HOME", raising=False)
+    monkeypatch.delenv("HERMES_HOME", raising=False)
+    selfx_entry._configure_home()
+    assert selfx_entry.os.environ["SELF_X_HOME"] == str(tmp_path / ".selfx")
+    assert selfx_entry.os.environ["HERMES_HOME"] == str(tmp_path / ".selfx")
+
+
+def test_explicit_selfx_home_overrides_legacy_home(monkeypatch, tmp_path):
+    from hermes_cli import selfx_entry
+
+    own_home = tmp_path / "self-x-data"
+    legacy_home = tmp_path / "hermes-data"
+    monkeypatch.setenv("SELF_X_HOME", str(own_home))
+    monkeypatch.setenv("HERMES_HOME", str(legacy_home))
+    selfx_entry._configure_home()
+    assert selfx_entry.os.environ["HERMES_HOME"] == str(own_home.resolve())

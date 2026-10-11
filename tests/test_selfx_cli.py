@@ -98,7 +98,7 @@ def test_identity_is_redacted_and_does_not_initialize_goal_database(monkeypatch,
 
 
 def test_diagnose_is_read_only_and_does_not_create_goal_database(monkeypatch, tmp_path, capsys):
-    import hermes_cli.config as config
+    from hermes_cli import config
 
     seen = {}
     monkeypatch.setattr(selfx, "_store", lambda: (_ for _ in ()).throw(AssertionError("must stay read-only")))

@@ -1,4 +1,4 @@
-# Hermes Agent bootstrap: git checkout + venv + hermes command on PATH.
+# Self-X bootstrap: git checkout + venv + Self-X command on PATH.
 # Heavy dependencies (tool binaries, browsers, node) are pm's job after
 # this: `hermes pm install`. Stage protocol kept for Hermes-Setup:
 #   -Manifest             print the stage list as JSON
@@ -20,8 +20,8 @@
 param(
     [string]$Branch = "main",
     [string]$Commit = "",
-    [string]$HermesHome = $(if ($env:HERMES_HOME) { $env:HERMES_HOME } else { "$env:LOCALAPPDATA\hermes" }),
-    [string]$InstallDir = $(if ($env:HERMES_HOME) { "$env:HERMES_HOME\hermes-agent" } else { "$env:LOCALAPPDATA\hermes\hermes-agent" }),
+    [string]$HermesHome = $(if ($env:SELF_X_HOME) { $env:SELF_X_HOME } elseif ($env:HERMES_HOME) { $env:HERMES_HOME } else { "$env:LOCALAPPDATA\Self-X" }),
+    [string]$InstallDir = $(if ($env:SELF_X_INSTALL_DIR) { $env:SELF_X_INSTALL_DIR } elseif ($env:HERMES_INSTALL_DIR) { $env:HERMES_INSTALL_DIR } elseif ($env:SELF_X_HOME) { "$env:SELF_X_HOME\self-x-agent" } elseif ($env:HERMES_HOME) { "$env:HERMES_HOME\self-x-agent" } else { "$env:LOCALAPPDATA\Self-X\self-x-agent" }),
     [switch]$Manifest,
     [string]$Stage,
     [switch]$ProtocolVersion,
@@ -71,7 +71,7 @@ $script:BoundParams = $PSBoundParameters
 # Under iex, script scope is the caller's session and outlives a run; start
 # each run without the previous run's answer (see Set-LauncherUserPath).
 $script:BinDirOnCallerPath = $null
-$RepoUrl = if ($env:HERMES_REPO_URL) { $env:HERMES_REPO_URL } else { "https://github.com/NousResearch/hermes-agent.git" }
+$RepoUrl = if ($env:SELF_X_REPO_URL) { $env:SELF_X_REPO_URL } elseif ($env:HERMES_REPO_URL) { $env:HERMES_REPO_URL } else { "https://github.com/abdulraheemnohri/Self-X-evolution-system.git" }
 
 # --- BEGIN GENERATED: bootstrap pins (scripts/gen-bootstrap-pins.py) ---
 # Derived from pm/lock.json. DO NOT EDIT BY HAND:
@@ -322,13 +322,13 @@ function Initialize-ResolvedPaths {
         ConvertTo-LongPath $HermesHome
     } else {
         ConvertTo-LongPath $(
-            if ($env:HERMES_HOME) { $env:HERMES_HOME } else { "$env:LOCALAPPDATA\hermes" }
+            if ($env:SELF_X_HOME) { $env:SELF_X_HOME } elseif ($env:HERMES_HOME) { $env:HERMES_HOME } else { "$env:LOCALAPPDATA\Self-X" }
         )
     }
     $resolvedDir = if ($script:BoundParams.ContainsKey('InstallDir')) {
         ConvertTo-LongPath $InstallDir
     } else {
-        Join-Path $resolvedHome 'hermes-agent'
+        Join-Path $resolvedHome 'self-x-agent'
     }
     # A HermesHome equal to or inside InstallDir puts the pm tool store
     # (<home>\tools) inside the checkout: the repository stage's
@@ -355,6 +355,7 @@ function Initialize-ResolvedPaths {
     # (-File, scriptblock, dot-source).
     Set-Variable -Scope 1 -Name HermesHome -Value $resolvedHome
     Set-Variable -Scope 1 -Name InstallDir -Value $resolvedDir
+    $env:SELF_X_HOME = $resolvedHome
     $env:HERMES_HOME = $resolvedHome
 
     # Captured here, where the values are final. The report goes to STDOUT as
@@ -618,7 +619,7 @@ function Write-Banner {
     Write-Host "+---------------------------------------------------------+" -ForegroundColor Magenta
     Write-Host "|             * Hermes Agent Installer                    |" -ForegroundColor Magenta
     Write-Host "+---------------------------------------------------------+" -ForegroundColor Magenta
-    Write-Host "|  An open source AI agent by Nous Research.              |" -ForegroundColor Magenta
+    Write-Host "|  Local-first autonomous agent and evolution system.     |" -ForegroundColor Magenta
     Write-Host "+---------------------------------------------------------+" -ForegroundColor Magenta
     Write-Host ""
 }

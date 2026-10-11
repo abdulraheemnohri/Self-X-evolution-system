@@ -36,3 +36,23 @@ def test_optional_dependency_failure_is_reported_not_raised():
     assert len(findings) == 1
     assert findings[0].id == "dependency-selfx_missing_test_dependency"
     assert findings[0].category == "dependency"
+
+
+def test_sqlite_quick_check_is_read_only_and_accepts_healthy_database(tmp_path):
+    import sqlite3
+
+    database = tmp_path / "healthy.db"
+    with sqlite3.connect(database) as connection:
+        connection.execute("CREATE TABLE example (id INTEGER PRIMARY KEY)")
+        connection.execute("INSERT INTO example DEFAULT VALUES")
+    findings = run_diagnostics(database_paths=[database], optional_imports=[])
+    assert not any(item.category == "database" for item in findings)
+    # Reopening read-only checks must not create journal/WAL sidecars for this simple DB.
+    assert database.exists()
+
+
+def test_sqlite_diagnostic_reports_missing_database_without_creating_it(tmp_path):
+    missing = tmp_path / "missing.db"
+    findings = run_diagnostics(database_paths=[missing], optional_imports=[])
+    assert any(item.id == "database-missing-missing.db" for item in findings)
+    assert not missing.exists()

@@ -4,6 +4,7 @@ import importlib
 import os
 import platform
 import shutil
+import sqlite3
 import time
 from dataclasses import asdict, dataclass
 from pathlib import Path
@@ -49,9 +50,10 @@ def collect_identity(*, enabled_tools: Iterable[str] = (), optional_imports: Ite
         "secrets_included": False,
     }
 
-def run_diagnostics(*, paths: Iterable[str | Path] = (), min_free_bytes: int = 100 * 1024 * 1024,
+def run_diagnostics(*, paths: Iterable[str | Path] = (), database_paths: Iterable[str | Path] = (),
+                    min_free_bytes: int = 100 * 1024 * 1024,
                     optional_imports: Iterable[str] = ("yaml", "httpx", "fastapi", "rich")) -> list[Finding]:
-    """Run read-only dependency, path, writability, and free-space checks."""
+    """Run read-only dependency, path, free-space, and SQLite integrity checks."""
     findings: list[Finding] = []
     now = time.time()
     for name in optional_imports:
@@ -83,4 +85,25 @@ def run_diagnostics(*, paths: Iterable[str | Path] = (), min_free_bytes: int = 1
             findings.append(Finding("disk-check-" + (path.name or "root"), "resources", "LOW",
                 "Disk usage could not be checked", type(exc).__name__,
                 "Check whether the path is mounted and accessible.", now))
+    for raw_db in database_paths:
+        path = Path(raw_db).expanduser()
+        if not path.is_file():
+            findings.append(Finding("database-missing-" + path.name, "database", "MEDIUM",
+                f"Database file is missing: {path.name}", "Database path does not exist",
+                "Confirm the configured database path; do not create a replacement automatically.", now))
+            continue
+        try:
+            # SQLite URI mode=ro prevents this diagnostic from creating or mutating a database.
+            uri = path.resolve().as_uri() + "?mode=ro"
+            with sqlite3.connect(uri, uri=True, timeout=2.0) as connection:
+                result = connection.execute("PRAGMA quick_check").fetchone()
+            if not result or result[0] != "ok":
+                findings.append(Finding("database-integrity-" + path.name, "database", "CRITICAL",
+                    f"SQLite quick_check reported a problem: {path.name}",
+                    str(result[0] if result else "No result"),
+                    "Stop writes and take a backup before attempting database recovery.", now))
+        except (sqlite3.Error, OSError, ValueError) as exc:
+            findings.append(Finding("database-check-" + path.name, "database", "HIGH",
+                f"Database integrity check could not complete: {path.name}", type(exc).__name__,
+                "Verify the path and permissions; preserve a backup before repair.", now))
     return findings

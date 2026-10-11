@@ -146,9 +146,7 @@ async def selfx_get_goal(goal_id: str, profile: Optional[str] = Query(default=No
 
 @router.post("/api/selfx/goals/{goal_id}/status")
 async def selfx_set_goal_status(goal_id: str, request: Request, profile: Optional[str] = Query(default=None)):
-    body = await request.json()
-    if not isinstance(body, dict):
-        raise HTTPException(status_code=422, detail="JSON object required")
+    body = await _read_object(request)
     status = _body_text(body, "status", required=True, limit=20)
     try:
         return _store(profile).set_goal_status(goal_id, status)

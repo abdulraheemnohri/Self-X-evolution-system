@@ -1,6 +1,4 @@
 """Behavioral tests for the read-only Self-X diagnostics primitives."""
-from pathlib import Path
-
 from agent.selfx_diagnostics import collect_identity, run_diagnostics
 
 

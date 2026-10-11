@@ -2,6 +2,7 @@
 import asyncio
 
 import pytest
+from fastapi import HTTPException
 
 from agent.selfx_goals import GoalStore
 from hermes_cli.web_routers import selfx as routes
@@ -75,8 +76,10 @@ def test_dashboard_rejects_invalid_payloads(monkeypatch, tmp_path):
     store = GoalStore(tmp_path / "goals.sqlite3")
     monkeypatch.setattr(routes, "_store", lambda profile=None: store)
 
-    with pytest.raises(Exception):
+    with pytest.raises(HTTPException) as exc:
         run(routes.selfx_create_goal(FakeRequest({"title": "  "})))
+    assert exc.value.status_code == 422
     goal = store.create_goal("Input validation")
-    with pytest.raises(Exception):
+    with pytest.raises(HTTPException) as exc:
         run(routes.selfx_add_task(goal["id"], FakeRequest({"title": "Bad retries", "max_attempts": 0})))
+    assert exc.value.status_code == 422

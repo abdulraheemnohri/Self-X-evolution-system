@@ -234,9 +234,18 @@ class GoalStore:
         """Atomically claim a pending task once; repeated claims cannot double-start it."""
         with self._connect() as db:
             db.execute("BEGIN IMMEDIATE")
-            row = db.execute("SELECT * FROM selfx_tasks WHERE id=?", (task_id,)).fetchone()
+            row = db.execute(
+                """SELECT t.*, g.status AS goal_status
+                   FROM selfx_tasks AS t
+                   JOIN selfx_goals AS g ON g.id = t.goal_id
+                   WHERE t.id = ?""",
+                (task_id,),
+            ).fetchone()
             if row is None:
                 raise KeyError(f"Unknown task: {task_id}")
+            # A paused, completed, or cancelled goal must never yield new work.
+            if row["goal_status"] != "active":
+                return None
             if row["status"] != "pending" or row["attempts"] >= row["max_attempts"]:
                 return None
             now = time.time()

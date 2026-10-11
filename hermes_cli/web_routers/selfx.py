@@ -22,7 +22,7 @@ _resolve_profile_dir = late("_resolve_profile_dir", "hermes_cli.web_server_profi
 def _store(profile: Optional[str] = None):
     from agent.selfx_goals import GoalStore
 
-    if profile and profile.strip() and profile.strip().lower() not in {"current", "default"}:
+    if profile and profile.strip() and profile.strip().lower() != "current":
         home = _resolve_profile_dir(profile.strip())
     else:
         home = Path(get_hermes_home())
@@ -106,7 +106,7 @@ async def selfx_identity():
 @router.get("/api/selfx/diagnostics")
 async def selfx_diagnostics(profile: Optional[str] = Query(default=None)):
     from agent.selfx_diagnostics import run_diagnostics
-    home = Path(_resolve_profile_dir(profile.strip())) if profile and profile.strip() and profile.strip().lower() not in {"current", "default"} else Path(get_hermes_home())
+    home = Path(_resolve_profile_dir(profile.strip())) if profile and profile.strip() and profile.strip().lower() != "current" else Path(get_hermes_home())
     database = home / "selfx" / "goals.sqlite3"
     findings = run_diagnostics(paths=[home], database_paths=[database] if database.is_file() else [])
     return {"schema_version": 1, "read_only": True, "finding_count": len(findings),

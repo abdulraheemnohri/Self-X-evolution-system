@@ -5,7 +5,7 @@ import { Card, CardContent } from "@nous-research/ui/ui/components/card";
 import { Input } from "@nous-research/ui/ui/components/input";
 import { Label } from "@nous-research/ui/ui/components/label";
 import { Spinner } from "@nous-research/ui/ui/components/spinner";
-import { fetchJSON } from "@/lib/api";
+import { fetchJSON, getManagementProfile } from "@/lib/api";
 
 type Goal = { id:string; title:string; description:string; status:"active"|"paused"|"completed"|"cancelled"; success_criteria:string[]; created_at:number; updated_at:number };
 type Task = { id:string; goal_id:string; title:string; status:string; attempts:number; max_attempts:number; last_error:string; updated_at:number };
@@ -14,8 +14,13 @@ type Status = { goal_count:number; goal_status_counts:Record<string,number>; tas
 type Detail = { goal:Goal; progress:{task_total:number;task_counts:Record<string,number>;task_completion_ratio:number;milestone_total:number;milestone_counts:Record<string,number>}; milestones:Array<{id:string;title:string;status:string}>; tasks:Task[] };
 type Event = { id:number;event_type:string;from_status:string|null;to_status:string;detail:string;created_at:number };
 
+function selfxFetchJSON<T>(url:string, init?:RequestInit):Promise<T> {
+  const profile = getManagementProfile();
+  const separator = url.includes("?") ? "&" : "?";
+  return fetchJSON<T>(profile ? url + separator + "profile=" + encodeURIComponent(profile) : url, init);
+}
 async function postJSON<T>(url:string, body?:unknown):Promise<T> {
-  return fetchJSON<T>(url,{method:"POST",headers:{"Content-Type":"application/json"},body:body===undefined?undefined:JSON.stringify(body)});
+  return selfxFetchJSON<T>(url,{method:"POST",headers:{"Content-Type":"application/json"},body:body===undefined?undefined:JSON.stringify(body)});
 }
 function dateLabel(value:number):string { return value ? new Date(value*1000).toLocaleString() : "—"; }
 function statusTone(value:string):string {
@@ -49,11 +54,11 @@ export default function SelfXPage() {
   const load = useCallback(async (preferredId?:string) => {
     setError("");
     try {
-      const next = await fetchJSON<Status>("/api/selfx/status");
+      const next = await selfxFetchJSON<Status>("/api/selfx/status");
       setData(next);
       const chosen = preferredId || (next.goals.some(g=>g.id===selectedId)?selectedId:(next.goals[0]?.id||""));
       setSelectedId(chosen);
-      setDetail(chosen ? await fetchJSON<Detail>("/api/selfx/goals/"+encodeURIComponent(chosen)) : null);
+      setDetail(chosen ? await selfxFetchJSON<Detail>("/api/selfx/goals/"+encodeURIComponent(chosen)) : null);
     } catch(e) { setError(e instanceof Error?e.message:String(e)); }
     finally { setLoading(false); }
   },[selectedId]);
@@ -91,13 +96,13 @@ export default function SelfXPage() {
   }
   async function taskHistory(id:string) {
     setEvents(null);
-    try { const result=await fetchJSON<{events:Event[]}>("/api/selfx/tasks/"+encodeURIComponent(id)+"/history");setEvents(result.events); }
+    try { const result=await selfxFetchJSON<{events:Event[]}>("/api/selfx/tasks/"+encodeURIComponent(id)+"/history");setEvents(result.events); }
     catch(e) {setError(e instanceof Error?e.message:String(e));}
   }
   async function diagnostics() {
     setBusy(true);setError("");
     try {
-      const results=await Promise.all([fetchJSON<Record<string,unknown>>("/api/selfx/identity"),fetchJSON<{findings:Finding[]}>("/api/selfx/diagnostics")]);
+      const results=await Promise.all([selfxFetchJSON<Record<string,unknown>>("/api/selfx/identity"),selfxFetchJSON<{findings:Finding[]}>("/api/selfx/diagnostics")]);
       setIdentity(results[0]);setFindings(results[1].findings);setNotice("Read-only diagnostics completed.");
     } catch(e) {setError(e instanceof Error?e.message:String(e));}
     finally {setBusy(false);}

@@ -299,7 +299,7 @@ The goal journal exposes read-only query methods for dashboards and future CLI i
 - `list_tasks(goal_id=None, status=None)` returns task records in stable creation order and validates status filters.
 - `list_milestones(goal_id=...)` returns the selected goal's milestones and acceptance criteria.
 - `get_progress(goal_id)` returns task/milestone counts and a completion ratio. An empty task list has ratio `0.0`; it is not treated as complete.
-- These methods do not claim, schedule, execute, approve, or mutate work. Recovered/pending work must still pass the existing policy and approval pipeline.
+- These methods do not claim, schedule, execute, approve, or mutate work. Task claiming also refuses work whose parent goal is paused, completed, or cancelled. Recovered/pending work must still pass the existing policy and approval pipeline.
 
 Focused tests cover the progress projection, query filtering, and observational behavior. CI must pass before this slice is considered verified.
 

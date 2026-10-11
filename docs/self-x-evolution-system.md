@@ -225,6 +225,8 @@ Add a Self-X section to the existing UI, reusing current patterns:
 
 Suggested CLI commands (reconcile names with existing conventions before implementation):
 - hermes self status
+hermes self identity
+hermes self diagnose
 - hermes self identity
 - hermes self diagnose --scope all
 - hermes self repair plan FINDING_ID

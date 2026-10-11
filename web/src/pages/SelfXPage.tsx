@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState, type FormEvent } from "react";
-import { Activity, Plus, RefreshCw, Sparkles, Target } from "lucide-react";
+import { Activity, Clock3, ListChecks, Plus, RefreshCw, Sparkles, Target } from "lucide-react";
 import { Button } from "@nous-research/ui/ui/components/button";
 import { Card, CardContent } from "@nous-research/ui/ui/components/card";
 import { Input } from "@nous-research/ui/ui/components/input";
@@ -16,6 +16,11 @@ type Detail = SelfXDetail;
 type Event = SelfXEvent;
 type Status = { goal_count:number; goal_status_counts:Record<string,number>; task_count:number; task_status_counts:Record<string,number>; goals:Goal[]; recent_tasks:Task[]; execution_enabled:boolean };
 
+function selfxFetchJSON<T>(url:string, init?:RequestInit):Promise<T> {
+  const profile = getManagementProfile();
+  const separator = url.includes("?") ? "&" : "?";
+  return fetchJSON<T>(profile ? url + separator + "profile=" + encodeURIComponent(profile) : url, init);
+}
 async function postJSON<T>(url:string, body?:unknown):Promise<T> {
   return selfxFetchJSON<T>(url,{method:"POST",headers:{"Content-Type":"application/json"},body:body===undefined?undefined:JSON.stringify(body)});
 }

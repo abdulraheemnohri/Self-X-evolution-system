@@ -303,3 +303,7 @@ The goal journal exposes read-only query methods for dashboards and future CLI i
 
 Focused tests cover the progress projection, query filtering, and observational behavior. CI must pass before this slice is considered verified.
 
+### Append-only task lifecycle history
+
+The task journal records lifecycle events in a separate SQLite table: task creation, claims, completion/failure, and interrupted-process recovery. The read-only `list_task_events(task_id)` API returns events in insertion order for audit and debugging. Event details are bounded for task errors, and history does not contain command output or secret values by design. This is an application-level append-only log, not a tamper-proof security audit log; users with direct database write access can alter it.
+

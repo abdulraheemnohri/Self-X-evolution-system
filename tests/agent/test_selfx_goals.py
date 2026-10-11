@@ -96,3 +96,27 @@ def test_inactive_goal_cannot_claim_pending_task(tmp_path, goal_status):
     assert store.claim_task(task["id"]) is None
     assert store.list_tasks(goal_id=goal["id"])[0]["status"] == "pending"
 
+def test_task_lifecycle_events_record_claim_completion_and_recovery(tmp_path):
+    store = GoalStore(tmp_path / "events.sqlite3")
+    goal = store.create_goal("Goal")
+    task = store.add_task(goal["id"], "Recover me", max_attempts=2)
+    store.claim_task(task["id"])
+    store.recover_interrupted_tasks()
+    store.claim_task(task["id"])
+    store.finish_task(task["id"], error="temporary failure")
+
+    events = store.list_task_events(task["id"])
+    assert [event["event_type"] for event in events] == [
+        "created", "claimed", "recovered", "claimed", "failed"
+    ]
+    assert events[0]["to_status"] == "pending"
+    assert events[2]["from_status"] == "running"
+    assert events[2]["to_status"] == "pending"
+    assert events[-1]["detail"] == "temporary failure"
+
+
+def test_task_event_query_rejects_unknown_task(tmp_path):
+    store = GoalStore(tmp_path / "events.sqlite3")
+    with pytest.raises(KeyError):
+        store.list_task_events("missing")
+

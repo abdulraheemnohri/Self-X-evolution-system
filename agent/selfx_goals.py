@@ -68,6 +68,17 @@ class GoalStore:
                 );
                 CREATE INDEX IF NOT EXISTS selfx_tasks_status_idx ON selfx_tasks(status, created_at);
                 CREATE INDEX IF NOT EXISTS selfx_milestones_goal_idx ON selfx_milestones(goal_id, status);
+                CREATE TABLE IF NOT EXISTS selfx_task_events (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    task_id TEXT NOT NULL REFERENCES selfx_tasks(id) ON DELETE CASCADE,
+                    event_type TEXT NOT NULL,
+                    from_status TEXT,
+                    to_status TEXT NOT NULL,
+                    detail TEXT NOT NULL DEFAULT '',
+                    created_at REAL NOT NULL
+                );
+                CREATE INDEX IF NOT EXISTS selfx_task_events_task_idx
+                    ON selfx_task_events(task_id, id);
             """)
 
     @staticmethod
@@ -165,6 +176,10 @@ class GoalStore:
                 (task_id, goal_id, milestone_id, title, key, self._json(payload or {}), max_attempts, now, now),
             )
             row = db.execute("SELECT * FROM selfx_tasks WHERE id=?", (task_id,)).fetchone()
+            db.execute(
+                "INSERT INTO selfx_task_events(task_id,event_type,from_status,to_status,detail,created_at) VALUES (?,?,?,?,?,?)",
+                (task_id, "created", None, "pending", "Task recorded; execution is not implied.", now),
+            )
         return self._task_dict(row)
 
     @staticmethod
@@ -253,6 +268,10 @@ class GoalStore:
                 "UPDATE selfx_tasks SET status='running', attempts=attempts+1, updated_at=? WHERE id=? AND status='pending'",
                 (now, task_id),
             )
+            db.execute(
+                "INSERT INTO selfx_task_events(task_id,event_type,from_status,to_status,detail,created_at) VALUES (?,?,?,?,?,?)",
+                (task_id, "claimed", "pending", "running", f"Attempt {row['attempts'] + 1} of {row['max_attempts']}", now),
+            )
             updated = db.execute("SELECT * FROM selfx_tasks WHERE id=?", (task_id,)).fetchone()
         return self._task_dict(updated)
 
@@ -266,12 +285,30 @@ class GoalStore:
             if row["status"] != "running":
                 raise ValueError(f"Task must be running to finish (is {row['status']})")
             status = "failed" if error is not None else "completed"
+            now = time.time()
+            detail = str(error or "")[:2000]
             db.execute(
                 "UPDATE selfx_tasks SET status=?, last_error=?, updated_at=? WHERE id=?",
-                (status, str(error or "")[:2000], time.time(), task_id),
+                (status, detail, now, task_id),
+            )
+            db.execute(
+                "INSERT INTO selfx_task_events(task_id,event_type,from_status,to_status,detail,created_at) VALUES (?,?,?,?,?,?)",
+                (task_id, "failed" if error is not None else "completed", "running", status, detail, now),
             )
             updated = db.execute("SELECT * FROM selfx_tasks WHERE id=?", (task_id,)).fetchone()
         return self._task_dict(updated)
+
+    def list_task_events(self, task_id: str) -> list[dict]:
+        """Return append-only lifecycle events for a task in recorded order."""
+        with self._connect() as db:
+            if not db.execute("SELECT 1 FROM selfx_tasks WHERE id=?", (task_id,)).fetchone():
+                raise KeyError(f"Unknown task: {task_id}")
+            rows = db.execute(
+                "SELECT id, task_id, event_type, from_status, to_status, detail, created_at "
+                "FROM selfx_task_events WHERE task_id=? ORDER BY id",
+                (task_id,),
+            ).fetchall()
+        return [dict(row) for row in rows]
 
     def recover_interrupted_tasks(self) -> list[dict]:
         """Requeue interrupted tasks with retry budget remaining; exhaust the rest as failed."""
@@ -282,15 +319,25 @@ class GoalStore:
             requeued, exhausted = [], []
             for row in running:
                 if row["attempts"] < row["max_attempts"]:
+                    detail = "Recovered after interrupted process; retry requires normal policy checks."
                     db.execute(
                         "UPDATE selfx_tasks SET status='pending', last_error=?, updated_at=? WHERE id=? AND status='running'",
-                        ("Recovered after interrupted process; retry requires normal policy checks.", recovered_at, row["id"]),
+                        (detail, recovered_at, row["id"]),
+                    )
+                    db.execute(
+                        "INSERT INTO selfx_task_events(task_id,event_type,from_status,to_status,detail,created_at) VALUES (?,?,?,?,?,?)",
+                        (row["id"], "recovered", "running", "pending", detail, recovered_at),
                     )
                     requeued.append(row["id"])
                 else:
+                    detail = "Retry budget exhausted after interrupted process."
                     db.execute(
                         "UPDATE selfx_tasks SET status='failed', last_error=?, updated_at=? WHERE id=? AND status='running'",
-                        ("Retry budget exhausted after interrupted process.", recovered_at, row["id"]),
+                        (detail, recovered_at, row["id"]),
+                    )
+                    db.execute(
+                        "INSERT INTO selfx_task_events(task_id,event_type,from_status,to_status,detail,created_at) VALUES (?,?,?,?,?,?)",
+                        (row["id"], "recovery_exhausted", "running", "failed", detail, recovered_at),
                     )
                     exhausted.append(row["id"])
             return [

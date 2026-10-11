@@ -37,6 +37,11 @@ def build_self_parser(subparsers, *, cmd_self) -> None:
     status = actions.add_parser("status", help="Summarize local goals and tasks")
     status.set_defaults(self_action="status")
 
+    identity = actions.add_parser("identity", help="Show a redacted runtime/capability snapshot")
+    identity.set_defaults(self_action="identity")
+    diagnose = actions.add_parser("diagnose", help="Run read-only local health checks")
+    diagnose.set_defaults(self_action="diagnose")
+
     goals = actions.add_parser("goals", help="Create, list, inspect or change goal status")
     goal_actions = goals.add_subparsers(dest="self_goal_action", required=True)
     create = goal_actions.add_parser("create", help="Create a local goal")
@@ -101,7 +106,24 @@ def cmd_self(args) -> int:
     action = getattr(args, "self_action", None) or "status"
     try:
         store = _store()
-        if action == "status":
+        if action == "identity":
+            from agent.selfx_diagnostics import collect_identity
+            _emit(collect_identity())
+        elif action == "diagnose":
+            from agent.selfx_diagnostics import run_diagnostics
+            home = Path(__import__("hermes_cli.config", fromlist=["get_hermes_home"]).get_hermes_home())
+            database = home / "selfx" / "goals.sqlite3"
+            findings = run_diagnostics(
+                paths=[home],
+                database_paths=[database] if database.is_file() else [],
+            )
+            _emit({
+                "schema_version": 1,
+                "read_only": True,
+                "finding_count": len(findings),
+                "findings": [finding.__dict__ for finding in findings],
+            })
+        elif action == "status":
             goals = store.list_goals()
             tasks = store.list_tasks()
             counts = {key: 0 for key in ("pending", "running", "completed", "failed", "cancelled")}

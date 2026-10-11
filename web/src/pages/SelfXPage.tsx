@@ -57,7 +57,7 @@ export default function SelfXPage() {
     } catch(e) { setError(e instanceof Error?e.message:String(e)); }
     finally { setLoading(false); }
   },[selectedId]);
-  useEffect(()=>{ void load(); },[]);
+  useEffect(()=>{ void load(); },[load]);
   const act = async (work:()=>Promise<unknown>, success:string, goalId?:string) => {
     setBusy(true);setError("");setNotice("");
     try { await work();setNotice(success);await load(goalId||selectedId); }

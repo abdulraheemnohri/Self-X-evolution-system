@@ -264,3 +264,14 @@ Integrate pages/settings; add cross-platform, security, failure-injection, migra
 ## Definition of done
 
 Each module has an implementation, tests, documented configuration, observable status, explicit permission boundaries, and a recovery path. Optional integrations degrade gracefully. Self-X never silently weakens Hermes security.
+
+
+## Implementation status (current branch)
+
+The first runtime slice now exists on `self-x-evolution-modules`:
+
+- `agent/selfx_diagnostics.py` provides read-only runtime identity/capability snapshots and local dependency/path/free-space diagnostics.
+- `tests/agent/test_selfx_diagnostics.py` covers safe environment metadata, missing-path behavior, normal directory checks, and unavailable optional dependencies.
+- This slice does not execute repairs, access the network, invoke a model, or change configuration.
+- The functions are primitives only: CLI/UI routing, durable finding storage, SQLite health checks, provider/model resolution, and integration with existing Hermes doctor/policy services remain future work.
+- Tests have been added but have not been executed in this editing environment. Run `scripts/run_tests.sh tests/agent/test_selfx_diagnostics.py` in a correctly bootstrapped development checkout.

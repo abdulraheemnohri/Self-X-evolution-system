@@ -111,7 +111,8 @@ def cmd_self(args) -> int:
             _emit(collect_identity())
         elif action == "diagnose":
             from agent.selfx_diagnostics import run_diagnostics
-            home = Path(__import__("hermes_cli.config", fromlist=["get_hermes_home"]).get_hermes_home())
+            from hermes_cli.config import get_hermes_home
+            home = Path(get_hermes_home())
             database = home / "selfx" / "goals.sqlite3"
             findings = run_diagnostics(
                 paths=[home],

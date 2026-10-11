@@ -156,9 +156,7 @@ async def selfx_set_goal_status(goal_id: str, request: Request, profile: Optiona
 
 @router.post("/api/selfx/goals/{goal_id}/milestones")
 async def selfx_add_milestone(goal_id: str, request: Request, profile: Optional[str] = Query(default=None)):
-    body = await request.json()
-    if not isinstance(body, dict):
-        raise HTTPException(status_code=422, detail="JSON object required")
+    body = await _read_object(request)
     try:
         return _store(profile).add_milestone(
             goal_id, _body_text(body, "title", required=True),
@@ -179,9 +177,7 @@ async def selfx_list_tasks(goal_id: Optional[str] = Query(default=None), status:
 
 @router.post("/api/selfx/goals/{goal_id}/tasks")
 async def selfx_add_task(goal_id: str, request: Request, profile: Optional[str] = Query(default=None)):
-    body = await request.json()
-    if not isinstance(body, dict):
-        raise HTTPException(status_code=422, detail="JSON object required")
+    body = await _read_object(request)
     max_attempts = body.get("max_attempts", 3)
     if isinstance(max_attempts, bool) or not isinstance(max_attempts, int) or not 1 <= max_attempts <= 20:
         raise HTTPException(status_code=422, detail="max_attempts must be an integer from 1 to 20")

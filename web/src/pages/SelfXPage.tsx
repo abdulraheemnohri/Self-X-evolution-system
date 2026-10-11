@@ -1,33 +1,23 @@
 import { useCallback, useEffect, useState, type FormEvent } from "react";
-import { Activity, AlertTriangle, CheckCircle2, Clock3, ListChecks, Plus, RefreshCw, RotateCcw, ShieldCheck, Sparkles, Target } from "lucide-react";
+import { Activity, Plus, RefreshCw, Sparkles, Target } from "lucide-react";
 import { Button } from "@nous-research/ui/ui/components/button";
 import { Card, CardContent } from "@nous-research/ui/ui/components/card";
 import { Input } from "@nous-research/ui/ui/components/input";
 import { Label } from "@nous-research/ui/ui/components/label";
 import { Spinner } from "@nous-research/ui/ui/components/spinner";
 import { fetchJSON, getManagementProfile } from "@/lib/api";
+import { GoalRegistryPanel, GoalDetailPanel, TaskJournalPanel, HealthRecoveryPanel } from "@/pages/SelfXPanels";
+import type { SelfXGoal, SelfXTask, SelfXDetail, SelfXFinding, SelfXEvent } from "@/pages/SelfXPanels";
 
-type Goal = { id:string; title:string; description:string; status:"active"|"paused"|"completed"|"cancelled"; success_criteria:string[]; created_at:number; updated_at:number };
-type Task = { id:string; goal_id:string; title:string; status:string; attempts:number; max_attempts:number; last_error:string; updated_at:number };
-type Finding = { id:string; category:string; severity:string; summary:string; evidence:string; suggested_action:string; timestamp:number };
+type Goal = SelfXGoal;
+type Task = SelfXTask;
+type Finding = SelfXFinding;
+type Detail = SelfXDetail;
+type Event = SelfXEvent;
 type Status = { goal_count:number; goal_status_counts:Record<string,number>; task_count:number; task_status_counts:Record<string,number>; goals:Goal[]; recent_tasks:Task[]; execution_enabled:boolean };
-type Detail = { goal:Goal; progress:{task_total:number;task_counts:Record<string,number>;task_completion_ratio:number;milestone_total:number;milestone_counts:Record<string,number>}; milestones:Array<{id:string;title:string;status:string}>; tasks:Task[] };
-type Event = { id:number;event_type:string;from_status:string|null;to_status:string;detail:string;created_at:number };
 
-function selfxFetchJSON<T>(url:string, init?:RequestInit):Promise<T> {
-  const profile = getManagementProfile();
-  const separator = url.includes("?") ? "&" : "?";
-  return fetchJSON<T>(profile ? url + separator + "profile=" + encodeURIComponent(profile) : url, init);
-}
 async function postJSON<T>(url:string, body?:unknown):Promise<T> {
   return selfxFetchJSON<T>(url,{method:"POST",headers:{"Content-Type":"application/json"},body:body===undefined?undefined:JSON.stringify(body)});
-}
-function dateLabel(value:number):string { return value ? new Date(value*1000).toLocaleString() : "—"; }
-function statusTone(value:string):string {
-  if (["active","completed","success","ok","available"].includes(value)) return "text-emerald-500";
-  if (["failed","cancelled","CRITICAL","HIGH","unavailable"].includes(value)) return "text-red-400";
-  if (["paused","pending","running","MEDIUM"].includes(value)) return "text-amber-400";
-  return "text-muted-foreground";
 }
 function Metric({label,value,icon:Icon}:{label:string;value:number;icon:typeof Activity}) {
   return <Card><CardContent className="flex items-center gap-3 p-4"><div className="rounded-md border border-border p-2"><Icon className="size-4 text-muted-foreground"/></div><div><div className="text-xs text-muted-foreground">{label}</div><div className="text-2xl font-semibold tabular-nums">{value}</div></div></CardContent></Card>;
@@ -124,7 +114,7 @@ export default function SelfXPage() {
       <h1 className="text-2xl font-semibold tracking-tight">Goals, health & recovery</h1>
       <p className="mt-1 max-w-3xl text-sm text-muted-foreground">Local-first self-management. Tasks are journal entries only; execution and approval controls remain with Hermes.</p>
     </div><div className="flex flex-wrap gap-2">
-      <Button variant="outline" disabled={busy} onClick={()=>void diagnostics()}><Activity className="mr-2 size-4"/>Run diagnostics</Button>
+      
       <Button variant="outline" disabled={busy} onClick={()=>void load(selectedId)}><RefreshCw className="mr-2 size-4"/>Refresh</Button>
       <Button onClick={()=>setShowGoalForm(v=>!v)}><Plus className="mr-2 size-4"/>New goal</Button>
     </div></header>
@@ -144,29 +134,12 @@ export default function SelfXPage() {
       <div className="flex gap-2"><Button type="submit" disabled={busy||!goalTitle.trim()}>Create goal</Button><Button type="button" variant="outline" onClick={()=>setShowGoalForm(false)}>Cancel</Button></div>
     </form></CardContent></Card>}
     <div className="grid min-w-0 gap-4 xl:grid-cols-2">
-      <Card><CardContent className="p-4 sm:p-5"><div className="mb-3 flex items-center justify-between"><h2 className="font-semibold">Goal registry</h2><span className="text-xs text-muted-foreground">{data?.goals.length||0} total</span></div>
-        {data?.goals.length?<div className="space-y-2">{data.goals.map(g=><button key={g.id} onClick={()=>{setSelectedId(g.id);void load(g.id);setEvents(null);}} className={"w-full rounded-md border p-3 text-left transition-colors hover:bg-muted/40 "+(selectedId===g.id?"border-primary/60 bg-muted/30":"border-border")}>
-          <div className="flex flex-wrap items-center justify-between gap-2"><span className="font-medium">{g.title}</span><span className={"text-xs uppercase "+statusTone(g.status)}>{g.status}</span></div>
-          {g.description&&<p className="mt-1 text-sm text-muted-foreground">{g.description}</p>}
-          <div className="mt-2 text-xs text-muted-foreground">{g.success_criteria.length} criteria · Updated {dateLabel(g.updated_at)}</div>
-        </button>)}</div>:<p className="rounded-md border border-dashed border-border p-5 text-sm text-muted-foreground">No goals yet. Create one to track measurable work.</p>}
-      </CardContent></Card>
-      <Card><CardContent className="p-4 sm:p-5">{goal?<><div className="flex flex-wrap items-start justify-between gap-3"><div><h2 className="font-semibold">{goal.title}</h2><p className="mt-1 break-all text-xs text-muted-foreground">ID: {goal.id}</p></div><span className={"text-xs uppercase "+statusTone(goal.status)}>{goal.status}</span></div>
-        <div className="mt-4"><div className="mb-1 flex justify-between text-xs text-muted-foreground"><span>Task completion</span><span>{completion}%</span></div><div className="h-2 overflow-hidden rounded-full bg-muted"><div className="h-full rounded-full bg-primary" style={{width:completion+"%"}}/></div></div>
-        <div className="mt-4 grid grid-cols-3 gap-2">{["pending","running","completed"].map(k=><div key={k} className="rounded-md border border-border p-2"><div className="text-xs capitalize text-muted-foreground">{k}</div><div className="text-xl font-semibold">{detail?.progress.task_counts[k]||0}</div></div>)}</div>
-        <div className="mt-4 flex flex-wrap gap-2">{goal.status==="active"&&<Button size="sm" variant="outline" onClick={()=>void changeStatus("paused")} disabled={busy}>Pause</Button>}{goal.status==="paused"&&<Button size="sm" variant="outline" onClick={()=>void changeStatus("active")} disabled={busy}>Resume</Button>}{!["completed","cancelled"].includes(goal.status)&&<Button size="sm" variant="outline" onClick={()=>void changeStatus("completed")} disabled={busy}><CheckCircle2 className="mr-1 size-4"/>Complete</Button>}{!["completed","cancelled"].includes(goal.status)&&<Button size="sm" variant="outline" onClick={()=>{if(window.confirm("Cancel this goal?"))void changeStatus("cancelled");}} disabled={busy}>Cancel</Button>}</div>
-        <div className="mt-5 border-t border-border pt-4"><h3 className="mb-2 text-sm font-semibold">Add task record</h3><form onSubmit={addTask} className="flex gap-2"><Input aria-label="Task title" value={taskTitle} onChange={e=>setTaskTitle(e.target.value)} maxLength={500} required placeholder="Describe a task (not executed)"/><Button type="submit" size="sm" disabled={busy||!taskTitle.trim()}><Plus className="mr-1 size-4"/>Add</Button></form></div>
-        <div className="mt-4 border-t border-border pt-4"><h3 className="mb-2 text-sm font-semibold">Milestones</h3><form onSubmit={addMilestone} className="flex gap-2"><Input aria-label="Milestone title" value={milestoneTitle} onChange={e=>setMilestoneTitle(e.target.value)} maxLength={500} required placeholder="Milestone title"/><Button type="submit" size="sm" variant="outline" disabled={busy||!milestoneTitle.trim()}>Add</Button></form>{detail?.milestones.map(m=><div key={m.id} className="mt-2 flex justify-between gap-2 text-sm"><span>{m.title}</span><span className={statusTone(m.status)}>{m.status}</span></div>)}</div>
-      </>:<div className="flex min-h-48 flex-col items-center justify-center text-center"><Target className="mb-2 size-8 text-muted-foreground"/><h2 className="font-semibold">Select a goal</h2><p className="mt-1 text-sm text-muted-foreground">Choose a goal or create one.</p></div>}</CardContent></Card>
+      <GoalRegistryPanel goals={data?.goals || []} selectedId={selectedId} onSelect={id=>{setSelectedId(id);void load(id);setEvents(null);}} />
+      <GoalDetailPanel detail={detail} busy={busy} taskTitle={taskTitle} setTaskTitle={setTaskTitle} milestoneTitle={milestoneTitle} setMilestoneTitle={setMilestoneTitle} onStatus={status=>void changeStatus(status)} onAddTask={addTask} onAddMilestone={addMilestone} />
     </div>
     <div className="grid min-w-0 gap-4 xl:grid-cols-2">
-      <Card><CardContent className="p-4 sm:p-5"><h2 className="mb-3 font-semibold">Task journal</h2>{detail?.tasks.length?detail.tasks.map(t=><div key={t.id} className="mb-2 rounded-md border border-border p-3"><div className="flex flex-wrap justify-between gap-2"><span className="font-medium">{t.title}</span><span className={"text-xs uppercase "+statusTone(t.status)}>{t.status}</span></div><div className="mt-1 text-xs text-muted-foreground">Attempts {t.attempts}/{t.max_attempts} · Updated {dateLabel(t.updated_at)}</div>{t.last_error&&<p className="mt-1 text-xs text-red-400">{t.last_error}</p>}<Button size="sm" variant="ghost" onClick={()=>void taskHistory(t.id)}>View history</Button></div>):<p className="text-sm text-muted-foreground">No tasks recorded for this goal.</p>}
-        {events&&<div className="mt-4 rounded-md border border-border p-3"><div className="mb-2 flex justify-between"><h3 className="text-sm font-semibold">Task lifecycle history</h3><Button size="sm" variant="ghost" onClick={()=>setEvents(null)}>Close</Button></div>{events.map(ev=><div key={ev.id} className="mb-2 border-l-2 border-border pl-3"><div className="flex justify-between gap-2 text-xs"><span>{ev.event_type}</span><span className="text-muted-foreground">{dateLabel(ev.created_at)}</span></div><p className="text-xs text-muted-foreground">{ev.from_status||"—"} → {ev.to_status} {ev.detail}</p></div>)}</div>}
-      </CardContent></Card>
-      <Card><CardContent className="p-4 sm:p-5"><div className="mb-3 flex items-center justify-between"><h2 className="font-semibold">Health & recovery</h2><ShieldCheck className="size-4 text-muted-foreground"/></div><p className="mb-3 text-sm text-muted-foreground">Health checks are read-only. Recovery changes journal state only; it never starts tasks.</p><div className="flex flex-wrap gap-2"><Button variant="outline" disabled={busy} onClick={()=>void recovery(false)}><RotateCcw className="mr-2 size-4"/>Preview recovery</Button><Button variant="outline" disabled={busy} onClick={()=>void recovery(true)}>Apply recovery state</Button></div>
-        {findings!==null&&<div className="mt-4"><h3 className="mb-2 text-sm font-semibold">Diagnostic findings ({findings.length})</h3>{findings.length?findings.map(f=><div key={f.id} className="mb-2 rounded-md border border-border p-3"><div className="flex items-center gap-2"><AlertTriangle className={"size-4 "+statusTone(f.severity)}/><span className="font-medium">{f.summary}</span><span className={"ml-auto text-xs "+statusTone(f.severity)}>{f.severity}</span></div><p className="mt-1 text-xs text-muted-foreground">{f.evidence}</p><p className="mt-1 text-xs">{f.suggested_action}</p></div>):<p className="text-sm text-emerald-500">No findings reported.</p>}</div>}
-        {identity&&<details className="mt-4"><summary className="cursor-pointer text-sm font-medium">Runtime identity snapshot</summary><pre className="mt-2 max-h-64 overflow-auto rounded-md bg-muted/40 p-3 text-xs">{JSON.stringify(identity,null,2)}</pre></details>}
-      </CardContent></Card>
+      <TaskJournalPanel detail={detail} events={events} onHistory={id=>void taskHistory(id)} onClear={()=>setEvents(null)} />
+      <HealthRecoveryPanel busy={busy} findings={findings} identity={identity} onDiagnostics={()=>void diagnostics()} onRecovery={apply=>void recovery(apply)} />
     </div>
     <p className="text-xs text-muted-foreground">Safety boundary: goal management, diagnostics and recovery are integrated; autonomous execution remains disabled until a dedicated adapter is connected to Hermes authorization and approvals.</p>
   </div>;

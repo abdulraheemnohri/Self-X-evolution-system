@@ -55,3 +55,35 @@ def test_rejects_empty_titles_and_invalid_status(tmp_path):
         store.create_goal("  ")
     with pytest.raises(ValueError):
         store.set_goal_status("missing", "unknown")
+
+def test_progress_projection_counts_tasks_and_milestones_without_claiming(tmp_path):
+    store = GoalStore(tmp_path / "progress.sqlite3")
+    goal = store.create_goal("Goal")
+    store.add_milestone(goal["id"], "Milestone")
+    completed = store.add_task(goal["id"], "Done")
+    running = store.add_task(goal["id"], "In progress")
+    store.claim_task(completed["id"])
+    store.finish_task(completed["id"])
+    store.claim_task(running["id"])
+
+    progress = store.get_progress(goal["id"])
+    assert progress["task_total"] == 2
+    assert progress["task_counts"]["completed"] == 1
+    assert progress["task_counts"]["running"] == 1
+    assert progress["task_completion_ratio"] == 0.5
+    assert progress["milestone_total"] == 1
+    assert progress["milestone_counts"]["pending"] == 1
+    assert store.list_tasks(goal_id=goal["id"], status="running")[0]["id"] == running["id"]
+
+
+def test_task_and_milestone_queries_validate_filters(tmp_path):
+    store = GoalStore(tmp_path / "queries.sqlite3")
+    goal = store.create_goal("Goal")
+    store.add_task(goal["id"], "Task")
+    assert len(store.list_tasks(goal_id=goal["id"])) == 1
+    assert store.list_tasks(status="completed") == []
+    with pytest.raises(ValueError):
+        store.list_tasks(status="unknown")
+    with pytest.raises(KeyError):
+        store.list_milestones(goal_id="missing")
+

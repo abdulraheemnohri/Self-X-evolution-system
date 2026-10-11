@@ -291,3 +291,15 @@ The first runtime slice now exists on `self-x-evolution-modules`:
 - This slice does not execute repairs, access the network, invoke a model, or change configuration.
 - The functions are primitives only: CLI/UI routing, durable finding storage, provider/model resolution, and integration with existing Hermes doctor/policy services remain future work.
 - Tests have been added but have not been executed in this editing environment. Run `scripts/run_tests.sh tests/agent/test_selfx_diagnostics.py` in a correctly bootstrapped development checkout.
+
+### Goal/task progress query API
+
+The goal journal exposes read-only query methods for dashboards and future CLI integration:
+
+- `list_tasks(goal_id=None, status=None)` returns task records in stable creation order and validates status filters.
+- `list_milestones(goal_id=...)` returns the selected goal's milestones and acceptance criteria.
+- `get_progress(goal_id)` returns task/milestone counts and a completion ratio. An empty task list has ratio `0.0`; it is not treated as complete.
+- These methods do not claim, schedule, execute, approve, or mutate work. Recovered/pending work must still pass the existing policy and approval pipeline.
+
+Focused tests cover the progress projection, query filtering, and observational behavior. CI must pass before this slice is considered verified.
+

@@ -407,7 +407,7 @@ from hermes_cli.subcommands.journey import build_journey_parser
 from hermes_cli.subcommands.computer_use import build_computer_use_parser
 from hermes_cli.subcommands.sessions import build_sessions_parser
 from hermes_cli.subcommands.completion import build_completion_parser
-from hermes_cli.subcommands.selfx import build_self_parser
+from hermes_cli.subcommands.selfx import build_self_parser, cmd_self
 
 
 def _require_tty(command_name: str) -> None:
@@ -3463,7 +3463,7 @@ def _build_cli_parser():
     build_uninstall_parser(subparsers, cmd_uninstall=cmd_uninstall)
     build_acp_parser(subparsers, cmd_acp=cmd_acp)
     build_profile_parser(subparsers, cmd_profile=cmd_profile)
-    build_self_parser(subparsers, cmd_self=__import__('hermes_cli.subcommands.selfx', fromlist=['cmd_self']).cmd_self)
+    build_self_parser(subparsers, cmd_self=cmd_self)
     build_completion_parser(subparsers, cmd_completion=cmd_completion, parser=parser)
     build_dashboard_parser(
         subparsers,

@@ -270,8 +270,8 @@ Each module has an implementation, tests, documented configuration, observable s
 
 The first runtime slice now exists on `self-x-evolution-modules`:
 
-- `agent/selfx_diagnostics.py` provides read-only runtime identity/capability snapshots and local dependency/path/free-space diagnostics.
+- `agent/selfx_diagnostics.py` provides read-only runtime identity/capability snapshots and local dependency/path/free-space/SQLite quick-check diagnostics.
 - `tests/agent/test_selfx_diagnostics.py` covers safe environment metadata, missing-path behavior, normal directory checks, and unavailable optional dependencies.
 - This slice does not execute repairs, access the network, invoke a model, or change configuration.
-- The functions are primitives only: CLI/UI routing, durable finding storage, SQLite health checks, provider/model resolution, and integration with existing Hermes doctor/policy services remain future work.
+- The functions are primitives only: CLI/UI routing, durable finding storage, provider/model resolution, and integration with existing Hermes doctor/policy services remain future work.
 - Tests have been added but have not been executed in this editing environment. Run `scripts/run_tests.sh tests/agent/test_selfx_diagnostics.py` in a correctly bootstrapped development checkout.

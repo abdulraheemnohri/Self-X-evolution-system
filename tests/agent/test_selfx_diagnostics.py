@@ -54,3 +54,14 @@ def test_sqlite_diagnostic_reports_missing_database_without_creating_it(tmp_path
     findings = run_diagnostics(database_paths=[missing], optional_imports=[])
     assert any(item.id == "database-missing-missing.db" for item in findings)
     assert not missing.exists()
+
+
+def test_sqlite_diagnostic_reports_unreadable_database(tmp_path):
+    database = tmp_path / "corrupt.db"
+    database.write_bytes(b"this is not a sqlite database")
+    findings = run_diagnostics(database_paths=[database], optional_imports=[])
+    assert any(
+        item.id == "database-check-corrupt.db" and item.category == "database"
+        for item in findings
+    )
+    assert database.read_bytes() == b"this is not a sqlite database"

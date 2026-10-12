@@ -346,3 +346,20 @@ them through the existing scheduler, authorization, tool-policy, and approval
 path. The journal alone cannot establish whether an external side effect already
 occurred, so tasks with side effects must be idempotent or independently checked
 before execution.
+
+
+### Dashboard integration
+
+The Hermes dashboard now has a **Self-X** navigation page at `/selfx`. It
+uses the existing authenticated dashboard API client and the currently selected
+management profile. The page provides goal registry and status changes,
+success criteria, task and milestone entry, task progress, lifecycle history,
+runtime identity, read-only diagnostics, and recovery preview/apply controls.
+
+The dashboard API is mounted at `/api/selfx`. It validates JSON input sizes
+and retry budgets, returns structured HTTP errors for invalid or unknown IDs,
+and uses the profile's local `selfx/goals.sqlite3` journal. Diagnostics do not
+initialize the goal store. Recovery apply only persists journal transitions;
+it does not enqueue or execute tasks. This phase deliberately does not claim
+full Hermes task execution integration: an executor must still be built against
+the existing scheduler, tool policy, authorization and approval contracts.
